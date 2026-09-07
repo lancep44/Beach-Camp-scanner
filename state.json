@@ -1,0 +1,17 @@
+{
+  "campgrounds": {},
+  "consecutive_failures": 0,
+  "failures_since_heartbeat": 0,
+  "last_error_email_utc": null,
+  "last_error_signature": null,
+  "last_heartbeat_utc": null,
+  "last_run_status": null,
+  "last_run_utc": null,
+  "last_success_utc": null,
+  "polls_since_heartbeat": 0,
+  "schema_version": 1,
+  "target": {
+    "arrival": null,
+    "departure": null
+  }
+}

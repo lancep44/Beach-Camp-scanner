@@ -1,0 +1,67 @@
+name: Resolve Facility IDs
+
+# Build-time only. Run this once (and again whenever you add or remove a
+# campground) to turn campground names into numeric FacilityIDs. The scanner
+# never performs this lookup at runtime.
+on:
+  workflow_dispatch:
+    inputs:
+      print_only:
+        description: "Print the table without writing or committing campgrounds.json"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Resolve campground names to FacilityIDs
+        run: |
+          set -o pipefail
+          if [ "${{ inputs.print_only }}" = "true" ]; then
+            python resolve_facilities.py --print-only 2>&1 | tee resolve.log
+          else
+            python resolve_facilities.py 2>&1 | tee resolve.log
+          fi
+
+      # Put the review table in the run summary so it is readable without
+      # digging through raw logs.
+      - name: Publish table to job summary
+        if: always()
+        run: |
+          {
+            echo '## Campground -> FacilityID resolution'
+            echo ''
+            echo '```'
+            cat resolve.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Commit campgrounds.json
+        if: ${{ success() && inputs.print_only != true }}
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if git diff --quiet -- campgrounds.json; then
+            echo "campgrounds.json unchanged; nothing to commit."
+            exit 0
+          fi
+
+          git add campgrounds.json
+          git commit -m "chore: resolve campground FacilityIDs"
+          git push origin "HEAD:${GITHUB_REF_NAME}"

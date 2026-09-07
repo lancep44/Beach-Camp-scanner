@@ -1,0 +1,89 @@
+name: Scan for campsites
+
+on:
+  schedule:
+    # Every 10 minutes. GitHub's scheduler is best-effort and can run late
+    # under load; that is acceptable here.
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Poll and print only — send no email, write no state"
+        type: boolean
+        default: false
+
+# Runs must never overlap: two runs writing state.json at once would race and
+# could double-alert or lose a transition.
+concurrency:
+  group: campsite-scan
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # No pip install step on purpose: the scanner is standard library only,
+      # so there is no dependency that can break or go missing months from now.
+
+      - name: Run scanner
+        id: scan
+        env:
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          ALERT_EMAIL_TO: ${{ secrets.ALERT_EMAIL_TO }}
+          ALERT_EMAIL_FROM: ${{ secrets.ALERT_EMAIL_FROM }}
+        run: |
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            python scanner.py --dry-run
+          else
+            python scanner.py
+          fi
+
+      # Always commit, even when the scan failed: the state file carries the
+      # error-throttle timestamps and failure counters, and the commit itself is
+      # what keeps the repository active so GitHub never disables the schedule
+      # for 60-day inactivity.
+      - name: Commit and push state
+        if: ${{ always() && inputs.dry_run != true }}
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if git diff --quiet -- state.json; then
+            echo "state.json unchanged; nothing to commit."
+            exit 0
+          fi
+
+          git add state.json
+          git commit -m "chore: scanner state $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+
+          branch="${GITHUB_REF_NAME}"
+          for attempt in 1 2 3 4; do
+            if git pull --rebase --autostash origin "$branch" \
+               && git push origin "HEAD:$branch"; then
+              echo "Pushed state on attempt $attempt."
+              exit 0
+            fi
+            delay=$((2 ** attempt))
+            echo "Push attempt $attempt failed; retrying in ${delay}s."
+            sleep "$delay"
+          done
+
+          echo "::error::Could not push state.json after 4 attempts."
+          exit 1

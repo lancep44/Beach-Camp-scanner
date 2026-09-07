@@ -1,0 +1,8 @@
+{
+  "resolved": false,
+  "generated_utc": null,
+  "note": "Placeholder. Run the 'Resolve Facility IDs' workflow (Actions tab) to populate this file with real FacilityIDs. The scanner refuses to run until it does.",
+  "source": "https://calirdr.usedirect.com/rdr/rdr/fd/{places,facilities}",
+  "unit_categories": {},
+  "campgrounds": []
+}
