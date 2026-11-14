@@ -1,14 +1,14 @@
 {
   "campgrounds": {},
-  "consecutive_failures": 266,
-  "failures_since_heartbeat": 266,
+  "consecutive_failures": 267,
+  "failures_since_heartbeat": 267,
   "last_error_email_utc": null,
   "last_error_signature": null,
   "last_heartbeat_utc": null,
   "last_run_status": "error",
-  "last_run_utc": "2026-11-14T07:58:53+00:00",
+  "last_run_utc": "2026-11-14T14:56:32+00:00",
   "last_success_utc": null,
-  "polls_since_heartbeat": 266,
+  "polls_since_heartbeat": 267,
   "schema_version": 1,
   "target": {
     "arrival": null,
